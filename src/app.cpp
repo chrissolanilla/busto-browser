@@ -18,8 +18,13 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+#include <atomic>
+#include <thread>
+
+#include "net.hpp"
+
+const uint32_t WIDTH = 1920;
+const uint32_t HEIGHT = 1080;
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -273,12 +278,84 @@ private:
 			//imgui stuff
 			ImGui_ImplVulkan_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
-			ImGui::NewFrame();
 
-			ImGui::Begin("I use Vulkan btw");
-			ImGui::Text("PORN");
-			ImGui::Text("boobs even");
+			int win_w, win_h;
+			glfwGetWindowSize(window, &win_w, &win_h);
+			float xscale = 1.0f, yscale = 1.0f;
+			glfwGetWindowContentScale(window, &xscale, &yscale);
+			ImGuiIO& io = ImGui::GetIO();
+			io.DisplaySize = ImVec2((float)win_w, (float)win_h);
+			io.DisplayFramebufferScale = ImVec2(xscale, yscale);
+
+			ImGui::NewFrame();
+			//
+			// ImGui::Begin("I use Vulkan btw");
+			// ImGui::Text("PORN");
+			// ImGui::Text("boobs even");
+			// ImGui::End();
+			//
+			//maybe this is 1better
+			ImGuiViewport* vp = ImGui::GetMainViewport();
+			ImGui::SetNextWindowPos(vp->WorkPos);
+			ImGui::SetNextWindowSize(vp->WorkSize);
+			ImGuiWindowFlags wf = ImGuiWindowFlags_NoDecoration
+                    | ImGuiWindowFlags_NoMove
+                    | ImGuiWindowFlags_NoSavedSettings
+                    | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+			//maybe this is better
+			// ImGuiIO& io = ImGui::GetIO();
+			// io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+			// ImGui::DockSpaceOverViewPort(ImGui::GetMainViewport());
+
+			static char url[512] = "https://chrissolanilla.com";
+			static std::string body;
+			static std::string last_err;
+			static long last_status = 0;
+			static std::atomic<bool> loading = false;
+
+			ImGui::Begin("Busto Browser");
+			ImGui::SetNextItemWidth(-1);
+			ImGui::InputText("URL", url, sizeof(url));
+
+			if (ImGui::Button("Go") && !loading.load()) {
+				loading = true;
+				body.clear(); last_err.clear(); last_status = 0;
+				std::string url_copy(url);
+				std::thread([url_copy]() {
+					auto r = http_get(url_copy);
+					body = r.body;
+					last_err = r.err;
+					last_status = r.status;
+					loading = false;
+				}).detach();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Clear")) { body.clear(); last_err.clear(); last_status = 0; }
+
+			if (loading) {
+				ImGui::SameLine();
+				ImGui::TextUnformatted("Loading...");
+			}
+
+			if (!last_err.empty()) {
+				ImGui::Text("Error: %s", last_err.c_str());
+			}
+			if (last_status) {
+				ImGui::Text("Status: %ld", last_status);
+			}
+
+			ImGui::Separator();
+
+			// Scrollable, wrapped text view
+			ImGui::BeginChild("body_scroll", ImVec2(0,0), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+			ImGui::PushTextWrapPos(0.0f);
+			ImGui::TextUnformatted(body.c_str());
+			ImGui::PopTextWrapPos();
+			ImGui::EndChild();
+
 			ImGui::End();
+
 
 			ImGui::Render();
 			//yah
@@ -760,23 +837,23 @@ private:
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 		//imgui stuff
+		VkViewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = static_cast<float>(swapChainExtent.width);
+		viewport.height = static_cast<float>(swapChainExtent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+		VkRect2D scissor{};
+		scissor.offset = {0, 0};
+		scissor.extent = swapChainExtent;
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-        VkViewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = static_cast<float>(swapChainExtent.width);
-        viewport.height = static_cast<float>(swapChainExtent.height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent = swapChainExtent;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
