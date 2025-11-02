@@ -22,6 +22,7 @@
 #include <thread>
 
 #include "net.hpp"
+#include "html_reader.hpp"
 
 const uint32_t WIDTH = 1920;
 const uint32_t HEIGHT = 1080;
@@ -314,10 +315,14 @@ private:
 			static long last_status = 0;
 			static std::atomic<bool> loading = false;
 
-			ImGui::Begin("Busto Browser");
-			ImGui::SetNextItemWidth(-1);
-			ImGui::InputText("URL", url, sizeof(url));
 
+			ImGui::Begin("Busto Browser", nullptr, wf);
+			ImGui::SetNextItemWidth(-1);
+			// ImGui::InputText("URL", url, sizeof(url));
+
+			//rendered vars
+			static std::string rendered;
+			static std::vector<LinkSpan> link_spans;
 			if (ImGui::Button("Go") && !loading.load()) {
 				loading = true;
 				body.clear(); last_err.clear(); last_status = 0;
@@ -330,6 +335,13 @@ private:
 					loading = false;
 				}).detach();
 			}
+			//rerender when body changes
+			static size_t last_len =0;
+			if(body.size() != last_len){
+				rendered = html_to_text_basic(body, link_spans);
+				last_len = body.size();
+			}
+
 			ImGui::SameLine();
 			if (ImGui::Button("Clear")) { body.clear(); last_err.clear(); last_status = 0; }
 
@@ -344,13 +356,17 @@ private:
 			if (last_status) {
 				ImGui::Text("Status: %ld", last_status);
 			}
+			//go when enter
+			if (ImGui::InputText("URL", url, sizeof(url), ImGuiInputTextFlags_EnterReturnsTrue)) {}
+
 
 			ImGui::Separator();
 
 			// Scrollable, wrapped text view
 			ImGui::BeginChild("body_scroll", ImVec2(0,0), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 			ImGui::PushTextWrapPos(0.0f);
-			ImGui::TextUnformatted(body.c_str());
+			// ImGui::TextUnformatted(body.c_str());
+			render_wrapped_with_links(rendered, link_spans);
 			ImGui::PopTextWrapPos();
 			ImGui::EndChild();
 
