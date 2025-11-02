@@ -1,3 +1,4 @@
+#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -12,6 +13,10 @@
 #include <limits>
 #include <optional>
 #include <set>
+
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -105,7 +110,6 @@ private:
 
 	//adding these for resize handling
 	bool framebufferResized = false;
-
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
 		if(width >0 && height >0 ) {
 			auto* app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
@@ -139,7 +143,76 @@ private:
 		createImageViews();
 
 		createFramebuffers();
-    }
+	}
+
+	//imgui stuff
+	VkDescriptorPool imguiPool = VK_NULL_HANDLE;
+
+	void createImGuiDescriptorPool() {
+		VkDescriptorPoolSize pool_sizes[] = {
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+		};
+		VkDescriptorPoolCreateInfo pool_info{};
+		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		pool_info.maxSets = 1000 * (uint32_t)(sizeof(pool_sizes)/sizeof(pool_sizes[0]));
+		pool_info.poolSizeCount = (uint32_t)(sizeof(pool_sizes)/sizeof(pool_sizes[0]));
+		pool_info.pPoolSizes = pool_sizes;
+
+		if (vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create ImGui descriptor pool");
+		}
+
+	}
+
+
+	void initImGui() {
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGui::StyleColorsDark();
+
+		ImGui_ImplGlfw_InitForVulkan(window, true);
+
+		ImGui_ImplVulkan_InitInfo init_info{};
+		init_info.ApiVersion      = VK_API_VERSION_1_0; // or VK_API_VERSION_1_3 if you bump it
+		init_info.Instance        = instance;
+		init_info.PhysicalDevice  = physicalDevice;
+		init_info.Device          = device;
+
+		QueueFamilyIndices q = findQueueFamilies(physicalDevice);
+		init_info.QueueFamily    = q.graphicsFamily.value();
+		init_info.Queue          = graphicsQueue;
+
+		init_info.DescriptorPool = imguiPool;      // using your own pool
+		init_info.DescriptorPoolSize = 0;          // 0 because we supply DescriptorPool
+		init_info.MinImageCount  = 2;
+		init_info.ImageCount     = static_cast<uint32_t>(swapChainImages.size());
+		init_info.PipelineCache  = VK_NULL_HANDLE;
+
+		// We use a regular render pass, not dynamic rendering:
+		init_info.UseDynamicRendering = false;
+
+		// >>> NEW FIELDS LIVE HERE:
+		init_info.PipelineInfoMain.RenderPass  = renderPass;
+		init_info.PipelineInfoMain.Subpass     = 0;
+		init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		// If you were using dynamic rendering you’d fill:
+		// init_info.PipelineInfoMain.PipelineRenderingCreateInfo = { ... };
+
+		// One-argument init on this backend:
+		ImGui_ImplVulkan_Init(&init_info);
+
+		// No CreateFontsTexture/DestroyFontUploadObjects on this backend.
+		// Fonts/device objects will be created lazily.
+	}
 
     void initWindow() {
         glfwInit();
@@ -178,6 +251,9 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
+		//after command pool
+		createImGuiDescriptorPool();
+		initImGui();
         createCommandBuffer();
         createSyncObjects();
     }
@@ -194,6 +270,18 @@ private:
 				vkDeviceWaitIdle(device);
 				//recreate swapchain
 			}
+			//imgui stuff
+			ImGui_ImplVulkan_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::Begin("I use Vulkan btw");
+			ImGui::Text("PORN");
+			ImGui::Text("boobs even");
+			ImGui::End();
+
+			ImGui::Render();
+			//yah
             drawFrame();
         }
 
@@ -201,6 +289,12 @@ private:
     }
 
     void cleanup() {
+		//imgui clanup
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+		vkDestroyDescriptorPool(device, imguiPool, nullptr);
+
         vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
         vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
         vkDestroyFence(device, inFlightFence, nullptr);
@@ -665,6 +759,8 @@ private:
         renderPassInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		//imgui stuff
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 

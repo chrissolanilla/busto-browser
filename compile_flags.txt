@@ -1,0 +1,4 @@
+-std=c++17
+-Iinclude
+-Ithird_party/imgui
+-Ithird_party/imgui/backends
