@@ -314,26 +314,30 @@ private:
 			static std::string last_err;
 			static long last_status = 0;
 			static std::atomic<bool> loading = false;
-
-
-			ImGui::Begin("Busto Browser", nullptr, wf);
-			ImGui::SetNextItemWidth(-1);
-			// ImGui::InputText("URL", url, sizeof(url));
-
-			//rendered vars
-			static std::string rendered;
-			static std::vector<LinkSpan> link_spans;
-			if (ImGui::Button("Go") && !loading.load()) {
+			auto do_fetch = [&](){
+				if (loading.load()) return;
 				loading = true;
 				body.clear(); last_err.clear(); last_status = 0;
 				std::string url_copy(url);
-				std::thread([url_copy]() {
+				std::thread([url_copy](){
 					auto r = http_get(url_copy);
-					body = r.body;
-					last_err = r.err;
+					body        = r.body;
+					last_err    = r.err;
 					last_status = r.status;
 					loading = false;
 				}).detach();
+			};
+
+			ImGui::Begin("Busto Browser", nullptr, wf);
+			ImGui::SetNextItemWidth(-1);
+			if (ImGui::InputText("URL", url, sizeof(url), ImGuiInputTextFlags_EnterReturnsTrue)) {
+				do_fetch();
+			}
+			//rendered vars
+			static std::string rendered;
+			static std::vector<LinkSpan> link_spans;
+			if (ImGui::Button("Go")) {
+				do_fetch();
 			}
 			//rerender when body changes
 			static size_t last_len =0;
@@ -356,8 +360,8 @@ private:
 			if (last_status) {
 				ImGui::Text("Status: %ld", last_status);
 			}
-			//go when enter
-			if (ImGui::InputText("URL", url, sizeof(url), ImGuiInputTextFlags_EnterReturnsTrue)) {}
+			// //go when enter
+			// if (ImGui::InputText("URL", url, sizeof(url), ImGuiInputTextFlags_EnterReturnsTrue)) {}
 
 
 			ImGui::Separator();
