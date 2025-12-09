@@ -224,20 +224,23 @@ private:
         glfwInit();
 
 		//chris wayland shit
-		glfwWindowHintString(GLFW_PLATFORM, "wayland");
+		// glfwWindowHintString(GLFW_PLATFORM, "wayland");
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 		//more weird wayland, lets compistior resize
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 		glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
 		//before
         // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-		glfwWindowHintString(GLFW_WAYLAND_APP_ID, "PORN");
-		glfwWindowHintString(GLFW_X11_CLASS_NAME, "PORN");
-		glfwWindowHintString(GLFW_X11_INSTANCE_NAME, "PORN");
+
+		//wont work on mac
+		// glfwWindowHintString(GLFW_WAYLAND_APP_ID, "PORN");
+		// glfwWindowHintString(GLFW_X11_CLASS_NAME, "PORN");
+		// glfwWindowHintString(GLFW_X11_INSTANCE_NAME, "PORN");
 
         window = glfwCreateWindow(WIDTH, HEIGHT, "PORN", nullptr, nullptr);
 		//wire up resize shit
@@ -425,44 +428,97 @@ private:
         glfwTerminate();
     }
 
-    void createInstance() {
-        if (enableValidationLayers && !checkValidationLayerSupport()) {
-            throw std::runtime_error("validation layers requested, but not available!");
-        }
+	void createInstance() {
+		if (enableValidationLayers && !checkValidationLayerSupport()) {
+			throw std::runtime_error("validation layers requested, but not available!");
+		}
 
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+		VkApplicationInfo appInfo{};
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName   = "Hello Triangle";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1,0,0);
+		appInfo.pEngineName        = "No Engine";
+		appInfo.engineVersion      = VK_MAKE_VERSION(1,0,0);
+		appInfo.apiVersion         = VK_API_VERSION_1_0;
 
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
+		// USE ONLY OUR CORRECT EXTENSION FUNCTION
+		auto extensions = getRequiredExtensions();
 
-        auto extensions = getRequiredExtensions();
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        createInfo.ppEnabledExtensionNames = extensions.data();
+		// Debug print
+		std::cout << "Extensions required:\n";
+		for (auto* ext : extensions) {
+			std::cout << "  " << ext << "\n";
+		}
 
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
+		VkInstanceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pApplicationInfo = &appInfo;
 
-            populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
-        } else {
-            createInfo.enabledLayerCount = 0;
+#ifdef __APPLE__
+		createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
 
-            createInfo.pNext = nullptr;
-        }
+		createInfo.enabledExtensionCount   = (uint32_t)extensions.size();
+		createInfo.ppEnabledExtensionNames = extensions.data();
 
-        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create instance!");
-        }
-    }
+		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount   = (uint32_t)validationLayers.size();
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+			populateDebugMessengerCreateInfo(debugCreateInfo);
+			createInfo.pNext = &debugCreateInfo;
+		} else {
+			createInfo.enabledLayerCount = 0;
+			createInfo.pNext = nullptr;
+		}
+
+		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create instance!");
+		}
+	}
+
+		//   void createInstance() {
+		//       if (enableValidationLayers && !checkValidationLayerSupport()) {
+		//           throw std::runtime_error("validation layers requested, but not available!");
+		//       }
+		//
+		//       VkApplicationInfo appInfo{};
+		//       appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		//       appInfo.pApplicationName = "Hello Triangle";
+		//       appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		//       appInfo.pEngineName = "No Engine";
+		//       appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		//       appInfo.apiVersion = VK_API_VERSION_1_0;
+		//
+		// //REQUIRED FOR MACOS + MOLTENVK
+		// extensions.push_back("VK_KHR_portability_enumeration");
+		// createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+		//
+		//       VkInstanceCreateInfo createInfo{};
+		//       createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		//       createInfo.pApplicationInfo = &appInfo;
+		//
+		//       auto extensions = getRequiredExtensions();
+		//       createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		//       createInfo.ppEnabledExtensionNames = extensions.data();
+		//
+		//       VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+		//       if (enableValidationLayers) {
+		//           createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		//           createInfo.ppEnabledLayerNames = validationLayers.data();
+		//
+		//           populateDebugMessengerCreateInfo(debugCreateInfo);
+		//           createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
+		//       } else {
+		//           createInfo.enabledLayerCount = 0;
+		//
+		//           createInfo.pNext = nullptr;
+		//       }
+		//
+		//       if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+		//           throw std::runtime_error("failed to create instance!");
+		//       }
+		//   }
 
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
         createInfo = {};
@@ -484,6 +540,13 @@ private:
     }
 
     void createSurface() {
+		uint32_t count;
+		const char** exts = glfwGetRequiredInstanceExtensions(&count);
+		std::cout << "GLFW reports these extensions:\n";
+		for (uint32_t i = 0; i < count; i++) {
+			std::cout << "  " << exts[i] << "\n";
+		}
+
         if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
@@ -1084,19 +1147,38 @@ private:
         return indices;
     }
 
-    std::vector<const char*> getRequiredExtensions() {
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	std::vector<const char*> getRequiredExtensions() {
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
+#ifdef __APPLE__
+		// Required on macOS (MoltenVK)
+		extensions.push_back("VK_KHR_portability_enumeration");
+		extensions.push_back("VK_KHR_get_physical_device_properties2");
+#endif
 
-        return extensions;
-    }
+		if (enableValidationLayers) {
+			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		}
+
+		return extensions;
+	}
+
+    // std::vector<const char*> getRequiredExtensions() {
+    //     uint32_t glfwExtensionCount = 0;
+    //     const char** glfwExtensions;
+    //     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    //
+    //     std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    //
+    //     if (enableValidationLayers) {
+    //         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    //     }
+    //
+    //     return extensions;
+    // }
 
     bool checkValidationLayerSupport() {
         uint32_t layerCount;

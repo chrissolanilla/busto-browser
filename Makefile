@@ -1,7 +1,30 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -O2 -Iinclude -Ithird_party/imgui -Ithird_party/imgui/backends
-LDLIBS := $(shell pkg-config --libs glfw3) -lvulkan -ldl -lpthread -lcurl
-# If needed on your setup, append: -lX11 -lXxf86vm -lXrandr -lXi
+# CXXFLAGS := -std=c++17 -O2 -Iinclude -Ithird_party/imgui -Ithird_party/imgui/backends
+CXXFLAGS := -std=c++17 -O2 -Iinclude -Ithird_party/imgui -Ithird_party/imgui/backends -I$(HOME)/brew/include
+GLFW_DIR := third_party/glfw
+GLFW_LIB := $(GLFW_DIR)/build/src/libglfw3.a
+GLFW_INC := -I$(GLFW_DIR)/include
+
+OSX_FRAMEWORKS := \
+	-framework Cocoa \
+	-framework IOKit \
+	-framework CoreVideo \
+	-framework QuartzCore \
+	-framework Metal
+
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S), Darwin)
+    CXXFLAGS += -I$(HOME)/brew/include -DNDEBUG -DVK_ENABLE_BETA_EXTENSIONS
+    LDFLAGS := -L$(HOME)/brew/lib
+    # LDLIBS := -lglfw -lvulkan -lcurl
+	LDLIBS := -lvulkan -lcurl $(OSX_FRAMEWORKS)
+    OSX_FRAMEWORKS := -framework Cocoa -framework IOKit -framework CoreVideo -framework QuartzCore -framework Metal
+    LDLIBS += $(OSX_FRAMEWORKS)
+else
+    # Linux
+    LDLIBS := $(shell pkg-config --libs glfw3) -lvulkan -ldl -lpthread -lcurl
+endif
 
 SRC_DIR := src
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
@@ -15,6 +38,7 @@ IMGUI_SRCS := \
   $(IMGUI)/imgui_tables.cpp \
   $(IMGUI)/backends/imgui_impl_glfw.cpp \
   $(IMGUI)/backends/imgui_impl_vulkan.cpp
+
 IMGUI_OBJS := $(IMGUI_SRCS:.cpp=.o)
 
 SHADER_DIR := shaders
@@ -27,17 +51,19 @@ SHADERS := $(VERT_SPV) $(FRAG_SPV)
 BIN := VulkanTest
 
 .PHONY: all clean
+
 all: $(BIN)
 
 $(BIN): $(OBJS) $(IMGUI_OBJS) $(SHADERS)
-	$(CXX) -o $@ $(OBJS) $(IMGUI_OBJS) $(LDLIBS)
+	$(CXX) -o $@ $(OBJS) $(IMGUI_OBJS) $(LDFLAGS) $(GLFW_LIB) $(LDLIBS)
 
-# compile any .cpp in src/
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
+# $(BIN): $(OBJS) $(IMGUI_OBJS) $(SHADERS)
+# 	$(CXX) -o $@ $(OBJS) $(IMGUI_OBJS) $(LDFLAGS) $(LDLIBS)
+
+third_party/imgui/%.o: third_party/imgui/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# compile ImGui sources
-third_party/imgui/%.o: third_party/imgui/%.cpp
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(VERT_SPV): $(VERT_SRC)

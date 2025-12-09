@@ -57,7 +57,7 @@ std::string html_to_text_basic(const std::string& in, std::vector<LinkSpan>& lin
         auto close = strcasestr(text_start, "</a>");
         if (!close) break;
         std::string url(url_start, url_end);
-        std::string label(text_start, close);
+        std::string label(text_start, close-text_start);
         //replace the anchor tag with a label
         size_t off = a - s.c_str();
         size_t len = (close + 4) - a;
